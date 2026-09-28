@@ -1,55 +1,62 @@
 # CPCB Archive Data Downloader
 
-This script (`Downloader.py`) downloads air quality data files from the CPCB archive (2017–2024) using download links provided in a master data CSV file. It supports checkpointing, so you can safely resume interrupted downloads.
+Two scripts to download air quality data from the CPCB archive:
+
+- **`script.py`** — builds the master CSV of download links.
+- **`Downloader.py`** — downloads every file listed in that master CSV.
+
+Both support the 2025 portal rebuild (links are auto-rewritten to the new endpoint) and checkpointing, so interrupted runs resume safely.
 
 ---
 
 ## Usage
 
-1. **Install required Python packages:**
-   - `pandas`
-   - `requests`
-
-2. **Place the appropriate master data file** (e.g., `15_Min_MasterDataFinal.csv`, `1_Hour_MasterDataFinal.csv`, or `1_Day_MasterDataFinal.csv`) in the same directory as `Downloader.py`.
-
-3. **Change the interval if needed:**
-   By default, the script uses `15_Min_MasterDataFinal.csv`. To download data at a different interval, edit this line in the script:
-   ```python
-   df = pd.read_csv('15_Min_MasterDataFinal.csv')
-   ```
-   to:
-   ```python
-   df = pd.read_csv('1_Hour_MasterDataFinal.csv')
-   # or
-   df = pd.read_csv('1_Day_MasterDataFinal.csv')
+1. **Install packages:**
+   ```bash
+   pip install pandas requests
    ```
 
-4. **Run the script:**
+2. **Build the link master** (needs `sites_master.csv` in the same folder):
+   ```bash
+   python script.py
+   ```
+   This writes `15_Min_MasterDataFinal.csv`. Edit the config block at the top of `script.py` to change:
+   - `FREQUENCY` — `'15Min'`, `'1Hr'`, or `'1Day'`
+   - `YEARS` — years to include (default 2017–2025)
+   - `VALIDATE` — `True` checks each link and keeps only files that exist (slower); `False` skips checking
+
+3. **Download the files:**
    ```bash
    python Downloader.py
    ```
+   Set which master and years to pull at the top of `Downloader.py`
+   (`df = pd.read_csv(...)` and `year_columns`).
 
-5. **Downloaded files** will be saved in the `CPCB_Full_Download/` directory, organized by state and city.
+4. **Downloaded files** are saved under `CPCB/<YEAR>_<FREQUENCY>/`
+   (e.g. `CPCB/2019_15Min/`).
 
 ---
 
-## Checkpointing & Diagnosis
+## Checkpointing
 
-- The script logs each successfully downloaded file in `download_log.txt`.
-- If the download process is interrupted (e.g., due to network issues or manual stop), simply re-run the script. It will skip files already downloaded and resume from where it left off.
-- To restart the download from scratch, delete `download_log.txt` and the `CPCB_Full_Download/` directory.
+- Each downloaded file is logged in `download_log.txt`.
+- Re-run `Downloader.py` to resume — already-downloaded files are skipped.
+- To start over, delete `download_log.txt` and the `CPCB/` directory.
 
 ---
 
 ## Notes
 
-- This script only fetches archive links (2017–2024).
-- For the latest (live) data, use the CPCB portal’s Advance Search:
+- These scripts fetch **archive** data (past years). For live data, use the
+  CPCB portal's Advance Search:
   [CPCB Live Data Portal](https://airquality.cpcb.gov.in/ccr/#/caaqm-dashboard-all/caaqm-landing)
+- Some stations have no data for certain years (e.g. IMD stations before they
+  came online); those links 404 and are skipped — this is expected, not an error.
 
 ---
 
 ## Troubleshooting
 
-- If you encounter errors related to missing columns or files, ensure your master data CSV matches the expected format and is present in the directory.
-- For network errors, check your internet connection and try again. 
+- **Missing columns/files:** ensure `sites_master.csv` / the master CSV are
+  present and match the expected format.
+- **Network errors:** check your connection and re-run (it resumes).

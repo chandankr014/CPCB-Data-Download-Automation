@@ -19,10 +19,21 @@ def append_to_download_log(identifier):
 
 
 df = pd.read_csv('15_Min_MasterDataFinal.csv')
-year_columns = ['2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017']
+year_columns = ['2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017']
+# year_columns=['2017']
 
 all_links = df[year_columns].stack().tolist()
 print("Total Files to Download: ", len(all_links))
+
+def to_new_url(link):
+    # CPCB rebuilt the portal in 2025: the old dataRepository/download_file
+    # endpoint is gone. Rewrite stored links to the new endpoint. Note the
+    # new URL also needs a leading slash before Raw_data.
+    return link.replace(
+        '/dataRepository/download_file?file_name=Raw_data/',
+        '/caaqms-common/dataRepository/download-excel-file?file_name=/Raw_data/'
+    )
+
 
 def generate_filename(url):
     parsed_url = urlparse(url)
@@ -30,6 +41,14 @@ def generate_filename(url):
     # Replace slashes with underscores and remove leading path
     formatted_name = file_name.replace('/', '_').replace('Raw_data_','')
     return formatted_name
+
+
+def parse_year_freq(link):
+    # file_name path looks like: Raw_data/<FREQ>/<YEAR>/<file>.csv
+    file_name = parse_qs(urlparse(link).query)['file_name'][0]
+    parts = file_name.strip('/').split('/')
+    freq, year = parts[-3], parts[-2]
+    return year, freq
 
 
 def extract_site_id(link):
@@ -53,13 +72,13 @@ for link in all_links:
         print(f'Skipping already downloaded: {filename}')
         continue
     c,s = extract_site_id(link)
-    save_dir = f'CPCB_Full_Download/{s}/{c}'
+    year, freq = parse_year_freq(link)
+    save_dir = os.path.join('CPCB', f'{year}_{freq}')
     file_path = os.path.join(save_dir, filename)
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 
     try:
-        response = requests.get(link, stream=True)
+        response = requests.get(to_new_url(link), stream=True)
         response.raise_for_status()  # Check for HTTP errors
 
         # Write the content to a file
